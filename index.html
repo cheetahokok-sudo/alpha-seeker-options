@@ -26,28 +26,24 @@ a{color:inherit;text-decoration:none}
 const {useState,useEffect,useRef}=React;
 
 // ═══════════════════════════════════════════════
-//  CONFIG — ใส่ API Keys ของคุณตรงนี้
+//  ใส่ API Keys ของคุณตรงนี้
 // ═══════════════════════════════════════════════
 const FINNHUB_KEY = "d6rv231r01qgflm163hgd6rv231r01qgflm163i0";
 const GROQ_KEY    = "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"; // ใส่ Groq key: gsk_xxxx (ฟรี console.groq.com)
 // ═══════════════════════════════════════════════
 
-const SCAN_TICKERS = ["NKE","SOFI","OXY","NVDA","TSLA","AMD","AAPL","META","PLTR","GLD","IBIT","BA","LLY","MRNA","PYPL","GS","XOM","DIS","NFLX","COIN","AMZN","MSFT","JPM","CVX","MSTR","SBUX","WMT","ABBV","PFE","F"];
-const SECTOR = {NKE:"Consumer",SOFI:"Fintech",OXY:"Energy",NVDA:"Semis",TSLA:"EV",AMD:"Semis",AAPL:"Tech",META:"Tech",PLTR:"AI",GLD:"Gold",IBIT:"BTC ETF",BA:"Industrial",LLY:"Pharma",MRNA:"Biotech",PYPL:"Fintech",GS:"Finance",XOM:"Energy",DIS:"Media",NFLX:"Media",COIN:"Crypto",AMZN:"Tech",MSFT:"Tech",JPM:"Finance",CVX:"Energy",MSTR:"Crypto",SBUX:"Consumer",WMT:"Retail",ABBV:"Pharma",PFE:"Pharma",F:"Auto"};
-const STRATEGIES = {"Bull Call Spread":{bias:"Bullish",iv:"Low-Med",color:"green",legs:["Buy lower strike Call","Sell higher strike Call (same expiry)"],when:"Moderately bullish. Cheaper than naked call.",payoff:[{x:0,y:-1},{x:40,y:-1},{x:55,y:0.5},{x:100,y:0.5}]},"Bear Put Spread":{bias:"Bearish",iv:"Low-Med",color:"red",legs:["Buy higher strike Put","Sell lower strike Put (same expiry)"],when:"Moderately bearish. Cheaper than naked put.",payoff:[{x:0,y:0.5},{x:45,y:0.5},{x:60,y:-1},{x:100,y:-1}]},"Iron Condor":{bias:"Neutral",iv:"High ≥50",color:"blue",legs:["Sell OTM Call","Buy further OTM Call","Sell OTM Put","Buy further OTM Put"],when:"High IV. Expect stock to stay in range.",payoff:[{x:0,y:-0.8},{x:20,y:-0.8},{x:35,y:0.6},{x:65,y:0.6},{x:80,y:-0.8},{x:100,y:-0.8}]},"Long Straddle":{bias:"Volatile",iv:"Low only",color:"purple",legs:["Buy ATM Call","Buy ATM Put (same strike & expiry)"],when:"Big move expected, direction unknown.",payoff:[{x:0,y:0.8},{x:35,y:-1},{x:50,y:-1},{x:65,y:-1},{x:100,y:0.8}]},"Cash-Secured Put":{bias:"Neutral-Bull",iv:"High",color:"teal",legs:["Sell OTM Put","Hold cash to cover assignment"],when:"High IV. Happy to own stock at lower price.",payoff:[{x:0,y:-0.8},{x:40,y:-0.8},{x:55,y:0.5},{x:100,y:0.5}]},"Covered Call":{bias:"Neutral",iv:"High",color:"amber",legs:["Own 100 shares","Sell OTM Call against position"],when:"Own shares already. High IV. Generate income.",payoff:[{x:0,y:-0.3},{x:40,y:0.5},{x:60,y:0.5},{x:100,y:0.5}]}};
-const UNUSUAL_FLOW = [{t:"NVDA",type:"Call",strike:900,exp:"Apr 17",vol:18420,oi:4200,ratio:4.38,prem:2.1,flag:"Bullish sweep"},{t:"TSLA",type:"Put",strike:160,exp:"Apr 4",vol:12800,oi:3100,ratio:4.13,prem:1.8,flag:"Bearish sweep"},{t:"AMD",type:"Call",strike:130,exp:"Apr 17",vol:9440,oi:2200,ratio:4.29,prem:1.4,flag:"Bullish block"},{t:"SPY",type:"Put",strike:540,exp:"Mar 28",vol:45200,oi:12000,ratio:3.77,prem:0.9,flag:"Hedge / protection"},{t:"GLD",type:"Call",strike:285,exp:"Jun 20",vol:14200,oi:3100,ratio:4.58,prem:3.8,flag:"Bullish sweep — Gold breakout"},{t:"IBIT",type:"Call",strike:62,exp:"Apr 17",vol:11600,oi:2800,ratio:4.14,prem:2.4,flag:"Bullish sweep — BTC momentum"},{t:"NKE",type:"Call",strike:90,exp:"Apr 17",vol:22400,oi:2600,ratio:8.62,prem:1.8,flag:"Post-earnings sweep"},{t:"MRNA",type:"Call",strike:70,exp:"May 16",vol:18800,oi:1560,ratio:12.05,prem:3.4,flag:"FDA catalyst sweep"},{t:"OXY",type:"Call",strike:55,exp:"Apr 17",vol:14200,oi:1560,ratio:9.10,prem:1.2,flag:"Buffett accumulation"},{t:"PYPL",type:"Call",strike:75,exp:"Apr 17",vol:11400,oi:2040,ratio:5.59,prem:1.6,flag:"Analyst upgrade sweep"},{t:"BA",type:"Put",strike:160,exp:"Apr 4",vol:9800,oi:1820,ratio:5.38,prem:2.1,flag:"Geopolitical hedge"}];
-const IV_MAP = {NKE:{r:71,iv:42},MRNA:{r:81,iv:74},OXY:{r:66,iv:38},PYPL:{r:67,iv:48},BA:{r:74,iv:52},LLY:{r:55,iv:36},GS:{r:48,iv:31},DIS:{r:56,iv:33},GLD:{r:58,iv:16},IBIT:{r:63,iv:52},NVDA:{r:68,iv:51},TSLA:{r:55,iv:68},SPY:{r:38,iv:17},AAPL:{r:42,iv:24},AMD:{r:72,iv:56},PLTR:{r:61,iv:72},SOFI:{r:44,iv:63}};
-const MACRO = {dxy:{value:"103.8",trend:"Weakening",note:"Weak USD = bullish Gold & BTC"},fed:{value:"4.25-4.50%",note:"Rate cuts expected Q3 2026 — bullish Gold"},realYield:{value:"1.82%",trend:"Falling",note:"Falling real yields = Gold bullish"},vix:{value:"18.4",trend:"Elevated",note:"High VIX = hedge demand for Gold"},fearGreed:{value:"62",label:"Greed",note:"Crypto momentum positive"},btcDom:{value:"54.2%",trend:"Rising",note:"BTC leading the rally"}};
-const CORR = [{a:"GLD",dxy:-0.82,sp:0.12,btc:0.31,oil:0.28},{a:"IBIT",dxy:-0.72,sp:0.64,btc:1.00,oil:0.18},{a:"SLV",dxy:-0.78,sp:0.24,btc:0.38,oil:0.32},{a:"RIG",dxy:-0.21,sp:0.58,btc:0.14,oil:0.82},{a:"SPY",dxy:0.18,sp:1.00,btc:0.64,oil:0.31}];
+const SCAN_TICKERS=["NKE","SOFI","OXY","NVDA","TSLA","AMD","AAPL","META","PLTR","GLD","IBIT","BA","LLY","MRNA","PYPL","GS","XOM","DIS","NFLX","COIN","AMZN","MSFT","JPM","CVX","MSTR","SBUX","WMT","ABBV","PFE","F"];
+const SECTOR={NKE:"Consumer",SOFI:"Fintech",OXY:"Energy",NVDA:"Semis",TSLA:"EV",AMD:"Semis",AAPL:"Tech",META:"Tech",PLTR:"AI",GLD:"Gold",IBIT:"BTC ETF",BA:"Industrial",LLY:"Pharma",MRNA:"Biotech",PYPL:"Fintech",GS:"Finance",XOM:"Energy",DIS:"Media",NFLX:"Media",COIN:"Crypto",AMZN:"Tech",MSFT:"Tech",JPM:"Finance",CVX:"Energy",MSTR:"Crypto",SBUX:"Consumer",WMT:"Retail",ABBV:"Pharma",PFE:"Pharma",F:"Auto"};
+const STRATEGIES={"Bull Call Spread":{bias:"Bullish",iv:"Low-Med",color:"green",legs:["Buy lower strike Call","Sell higher strike Call (same expiry)"],when:"Moderately bullish. Cheaper than naked call.",payoff:[{x:0,y:-1},{x:40,y:-1},{x:55,y:0.5},{x:100,y:0.5}]},"Bear Put Spread":{bias:"Bearish",iv:"Low-Med",color:"red",legs:["Buy higher strike Put","Sell lower strike Put (same expiry)"],when:"Moderately bearish. Cheaper than naked put.",payoff:[{x:0,y:0.5},{x:45,y:0.5},{x:60,y:-1},{x:100,y:-1}]},"Iron Condor":{bias:"Neutral",iv:"High ≥50",color:"blue",legs:["Sell OTM Call","Buy further OTM Call","Sell OTM Put","Buy further OTM Put"],when:"High IV. Expect stock to stay in range.",payoff:[{x:0,y:-0.8},{x:20,y:-0.8},{x:35,y:0.6},{x:65,y:0.6},{x:80,y:-0.8},{x:100,y:-0.8}]},"Long Straddle":{bias:"Volatile",iv:"Low only",color:"purple",legs:["Buy ATM Call","Buy ATM Put (same strike & expiry)"],when:"Big move expected, direction unknown.",payoff:[{x:0,y:0.8},{x:35,y:-1},{x:50,y:-1},{x:65,y:-1},{x:100,y:0.8}]},"Cash-Secured Put":{bias:"Neutral-Bull",iv:"High",color:"teal",legs:["Sell OTM Put","Hold cash to cover assignment"],when:"High IV. Happy to own stock at lower price.",payoff:[{x:0,y:-0.8},{x:40,y:-0.8},{x:55,y:0.5},{x:100,y:0.5}]},"Covered Call":{bias:"Neutral",iv:"High",color:"amber",legs:["Own 100 shares","Sell OTM Call against position"],when:"Own shares. High IV. Generate income.",payoff:[{x:0,y:-0.3},{x:40,y:0.5},{x:60,y:0.5},{x:100,y:0.5}]}};
+const UNUSUAL_FLOW=[{t:"NVDA",type:"Call",strike:900,exp:"Apr 17",vol:18420,oi:4200,ratio:4.38,prem:2.1,flag:"Bullish sweep"},{t:"TSLA",type:"Put",strike:160,exp:"Apr 4",vol:12800,oi:3100,ratio:4.13,prem:1.8,flag:"Bearish sweep"},{t:"AMD",type:"Call",strike:130,exp:"Apr 17",vol:9440,oi:2200,ratio:4.29,prem:1.4,flag:"Bullish block"},{t:"SPY",type:"Put",strike:540,exp:"Mar 28",vol:45200,oi:12000,ratio:3.77,prem:0.9,flag:"Hedge"},{t:"GLD",type:"Call",strike:285,exp:"Jun 20",vol:14200,oi:3100,ratio:4.58,prem:3.8,flag:"Gold breakout sweep"},{t:"IBIT",type:"Call",strike:62,exp:"Apr 17",vol:11600,oi:2800,ratio:4.14,prem:2.4,flag:"BTC momentum sweep"},{t:"NKE",type:"Call",strike:90,exp:"Apr 17",vol:22400,oi:2600,ratio:8.62,prem:1.8,flag:"Post-earnings sweep"},{t:"MRNA",type:"Call",strike:70,exp:"May 16",vol:18800,oi:1560,ratio:12.05,prem:3.4,flag:"FDA catalyst sweep"},{t:"OXY",type:"Call",strike:55,exp:"Apr 17",vol:14200,oi:1560,ratio:9.10,prem:1.2,flag:"Buffett accumulation"},{t:"PYPL",type:"Call",strike:75,exp:"Apr 17",vol:11400,oi:2040,ratio:5.59,prem:1.6,flag:"Analyst upgrade sweep"},{t:"BA",type:"Put",strike:160,exp:"Apr 4",vol:9800,oi:1820,ratio:5.38,prem:2.1,flag:"Geopolitical hedge"}];
+const IV_MAP={NKE:{r:71,iv:42},MRNA:{r:81,iv:74},OXY:{r:66,iv:38},PYPL:{r:67,iv:48},BA:{r:74,iv:52},LLY:{r:55,iv:36},GS:{r:48,iv:31},DIS:{r:56,iv:33},GLD:{r:58,iv:16},IBIT:{r:63,iv:52},NVDA:{r:68,iv:51},TSLA:{r:55,iv:68},SPY:{r:38,iv:17},AAPL:{r:42,iv:24},AMD:{r:72,iv:56},PLTR:{r:61,iv:72},SOFI:{r:44,iv:63}};
+const MACRO={dxy:{value:"103.8",trend:"Weakening",note:"Weak USD = bullish Gold & BTC"},fed:{value:"4.25-4.50%",note:"Rate cuts expected Q3 2026"},realYield:{value:"1.82%",trend:"Falling",note:"Falling real yields = bullish Gold"},vix:{value:"18.4",trend:"Elevated",note:"High VIX = hedge demand"},fearGreed:{value:"62",label:"Greed",note:"Crypto momentum positive"},btcDom:{value:"54.2%",trend:"Rising",note:"BTC leading the rally"}};
+const CORR=[{a:"GLD",dxy:-0.82,sp:0.12,btc:0.31,oil:0.28},{a:"IBIT",dxy:-0.72,sp:0.64,btc:1.00,oil:0.18},{a:"SLV",dxy:-0.78,sp:0.24,btc:0.38,oil:0.32},{a:"RIG",dxy:-0.21,sp:0.58,btc:0.14,oil:0.82},{a:"SPY",dxy:0.18,sp:1.00,btc:0.64,oil:0.31}];
+const CLR={green:["#EAF3DE","#3B6D11"],red:["#FCEBEB","#A32D2D"],amber:["#FAEEDA","#854F0B"],blue:["#E6F1FB","#185FA5"],gray:["#F1EFE8","#5F5E5A"],teal:["#E1F5EE","#0F6E56"],purple:["#EEEDFE","#3C3489"]};
+const fmt=n=>n>=1e6?(n/1e6).toFixed(1)+"M":n>=1e3?(n/1e3).toFixed(0)+"K":String(n);
 
-// ─── Colors ───────────────────────────────────
-const CLR = {green:["#EAF3DE","#3B6D11"],red:["#FCEBEB","#A32D2D"],amber:["#FAEEDA","#854F0B"],blue:["#E6F1FB","#185FA5"],gray:["#F1EFE8","#5F5E5A"],teal:["#E1F5EE","#0F6E56"],purple:["#EEEDFE","#3C3489"]};
-const fmt = n => n>=1e6?(n/1e6).toFixed(1)+"M":n>=1e3?(n/1e3).toFixed(0)+"K":String(n);
-
-// ─── UI Components ─────────────────────────────
 const Bdg=({c,ch})=>{const[bg,fg]=CLR[c]||CLR.gray;return <span style={{background:bg,color:fg,fontSize:11,fontWeight:600,padding:"2px 8px",borderRadius:6,whiteSpace:"nowrap",display:"inline-block"}}>{ch}</span>;};
 const IVBar=({v})=>{const col=v>=70?"#A32D2D":v>=40?"#854F0B":"#3B6D11";return <div style={{display:"flex",alignItems:"center",gap:5}}><div style={{flex:1,height:5,background:"#F1EFE8",borderRadius:3,overflow:"hidden"}}><div style={{width:`${Math.min(100,v)}%`,height:"100%",background:col,borderRadius:3}}/></div><span style={{fontSize:11,fontWeight:600,color:col,minWidth:24}}>{v}</span></div>;};
-const LiqDots=({level})=>{const n=level==="Very High"?4:level==="High"?3:level==="Medium"?2:1;const col=n>=3?"#3B6D11":n===2?"#854F0B":"#A32D2D";return <div style={{display:"flex",gap:3}}>{[1,2,3,4].map(i=><div key={i} style={{width:7,height:7,borderRadius:"50%",background:i<=n?col:"#F1EFE8",border:`1px solid ${col}`}}/>)}</div>;};
 const CorrCell=({val})=>{const col=val>0.5?"#3B6D11":val>0?"#639922":val>-0.5?"#A32D2D":"#7A1E1E";const bg=val>0.5?"#EAF3DE":val>0?"#F4F9EE":val>-0.5?"#FCEBEB":"#F7D0D0";return <td style={{textAlign:"center",padding:"6px 8px",fontSize:12,fontWeight:600,background:bg,color:col,borderBottom:"1px solid #f3f4f6"}}>{val.toFixed(2)}</td>;};
 
 function Arc({score}){
@@ -56,32 +52,114 @@ function Arc({score}){
   const R=22,circ=2*Math.PI*R,dash=circ*(score/100);
   return(<div style={{position:"relative",width:52,height:52,flexShrink:0}}><svg width={52} height={52} style={{transform:"rotate(-90deg)"}}><circle cx={26} cy={26} r={R} fill="none" stroke="#e0e0e0" strokeWidth={4}/><circle cx={26} cy={26} r={R} fill="none" stroke={col} strokeWidth={4} strokeDasharray={`${dash} ${circ}`} strokeLinecap="round"/></svg><div style={{position:"absolute",inset:0,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center"}}><span style={{fontSize:13,fontWeight:700,color:col,lineHeight:1}}>{score}</span><span style={{fontSize:9,color:col}}>AI</span></div></div>);
 }
-
 function PayoffChart({shape,color}){
-  const[bg,fg]=CLR[color]||CLR.blue;
-  const W=140,H=55,pad=6;
-  const tx=x=>pad+x*(W-2*pad)/100,ty=y=>H/2-(y*(H/2-pad));
-  const pts=shape.map(p=>`${tx(p.x)},${ty(p.y)}`).join(" ");
-  return(<svg width={W} height={H}><line x1={pad} y1={H/2} x2={W-pad} y2={H/2} stroke="#ddd" strokeWidth={1}/><line x1={W/2} y1={pad} x2={W/2} y2={H-pad} stroke="#ddd" strokeWidth={1}/><polyline points={pts} fill="none" stroke={fg} strokeWidth={2.5} strokeLinejoin="round"/></svg>);
+  const[,fg]=CLR[color]||CLR.blue;
+  const W=140,H=55,pad=6,tx=x=>pad+x*(W-2*pad)/100,ty=y=>H/2-(y*(H/2-pad));
+  return(<svg width={W} height={H}><line x1={pad} y1={H/2} x2={W-pad} y2={H/2} stroke="#ddd" strokeWidth={1}/><line x1={W/2} y1={pad} x2={W/2} y2={H-pad} stroke="#ddd" strokeWidth={1}/><polyline points={shape.map(p=>`${tx(p.x)},${ty(p.y)}`).join(" ")} fill="none" stroke={fg} strokeWidth={2.5} strokeLinejoin="round"/></svg>);
 }
 
-// ─── API Functions ─────────────────────────────
-async function getQ(t){try{const r=await fetch(`https://finnhub.io/api/v1/quote?symbol=${t}&token=${FINNHUB_KEY}`);const d=await r.json();if(!d||!d.c||d.c===0)return null;return{price:d.c.toFixed(2),change:((d.c-d.pc)/d.pc*100).toFixed(2),high:d.h.toFixed(2),low:d.l.toFixed(2),prev:d.pc.toFixed(2),ok:true};}catch{return null;}}
-async function getNews(t){try{const to=new Date().toISOString().slice(0,10);const from=new Date(Date.now()-3*864e5).toISOString().slice(0,10);const r=await fetch(`https://finnhub.io/api/v1/company-news?symbol=${t}&from=${from}&to=${to}&token=${FINNHUB_KEY}`);const d=await r.json();if(!Array.isArray(d)||!d.length)return[];return d.slice(0,4).map(n=>({h:n.headline,src:n.source,url:n.url,dt:new Date(n.datetime*1000).toLocaleDateString("th-TH")}));}catch{return[];}}
-async function getRec(t){try{const r=await fetch(`https://finnhub.io/api/v1/stock/recommendation?symbol=${t}&token=${FINNHUB_KEY}`);const d=await r.json();return Array.isArray(d)&&d.length?d[0]:null;}catch{return null;}}
-async function getEarnings(){try{const from=new Date().toISOString().slice(0,10);const to=new Date(Date.now()+45*864e5).toISOString().slice(0,10);const r=await fetch(`https://finnhub.io/api/v1/calendar/earnings?from=${from}&to=${to}&token=${FINNHUB_KEY}`);const d=await r.json();return(d.earningsCalendar||[]).filter(e=>e.symbol&&e.date).slice(0,40);}catch{return[];}}
-
-async function callAI(prompt){
-  if(!GROQ_KEY)return{confidence:45,signal:"Neutral",catalyst:"ไม่มี Groq key",strategy:"ใส่ GROQ_KEY ใน index.html",headline:"⚠️ กรุณาใส่ Groq API key (ฟรี) ที่ console.groq.com",interesting:false};
+// ─── API calls (CORS-safe) ────────────────────
+async function getQ(t){
   try{
-    const r=await fetch("https://api.groq.com/openai/v1/chat/completions",{method:"POST",headers:{"Content-Type":"application/json","Authorization":`Bearer ${GROQ_KEY}`},body:JSON.stringify({model:"llama3-8b-8192",max_tokens:300,temperature:0.2,messages:[{role:"system",content:"You are an expert options trader. Reply ONLY with valid JSON, no markdown, no explanation."},{role:"user",content:prompt}]})});
+    const r=await fetch(`https://finnhub.io/api/v1/quote?symbol=${t}&token=${FINNHUB_KEY}`);
     const d=await r.json();
-    const txt=d.choices?.[0]?.message?.content||"{}";
-    return JSON.parse(txt.replace(/```json|```/g,"").trim());
+    if(!d||!d.c||d.c===0)return null;
+    return{price:d.c.toFixed(2),change:((d.c-d.pc)/d.pc*100).toFixed(2),high:d.h.toFixed(2),low:d.l.toFixed(2),prev:d.pc.toFixed(2),ok:true};
   }catch{return null;}
 }
 
-// ─── MAIN APP ──────────────────────────────────
+async function getNews(t){
+  try{
+    const to=new Date().toISOString().slice(0,10);
+    const from=new Date(Date.now()-3*864e5).toISOString().slice(0,10);
+    const r=await fetch(`https://finnhub.io/api/v1/company-news?symbol=${t}&from=${from}&to=${to}&token=${FINNHUB_KEY}`);
+    const d=await r.json();
+    if(!Array.isArray(d)||!d.length)return[];
+    return d.slice(0,4).map(n=>({h:n.headline,src:n.source,url:n.url,dt:new Date(n.datetime*1000).toLocaleDateString("th-TH")}));
+  }catch{return[];}
+}
+
+async function getRec(t){
+  try{
+    const r=await fetch(`https://finnhub.io/api/v1/stock/recommendation?symbol=${t}&token=${FINNHUB_KEY}`);
+    const d=await r.json();
+    return Array.isArray(d)&&d.length?d[0]:null;
+  }catch{return null;}
+}
+
+async function getEarnings(){
+  try{
+    const from=new Date().toISOString().slice(0,10);
+    const to=new Date(Date.now()+45*864e5).toISOString().slice(0,10);
+    const r=await fetch(`https://finnhub.io/api/v1/calendar/earnings?from=${from}&to=${to}&token=${FINNHUB_KEY}`);
+    const d=await r.json();
+    return(d.earningsCalendar||[]).filter(e=>e.symbol&&e.date).slice(0,40);
+  }catch{return[];}
+}
+
+// ─── Groq AI — 3 proxy fallbacks ─────────────
+async function callAI(prompt){
+  if(!GROQ_KEY){
+    return{confidence:45,signal:"Neutral",catalyst:"ไม่มี Groq key",strategy:"ใส่ GROQ_KEY ใน index.html",headline:"⚠️ กรุณาใส่ Groq API key (ฟรี) ที่ console.groq.com",interesting:false};
+  }
+
+  const body=JSON.stringify({
+    model:"llama3-8b-8192",
+    max_tokens:300,
+    temperature:0.2,
+    messages:[
+      {role:"system",content:"You are an expert options trader. Reply ONLY with valid JSON, no markdown, no extra text."},
+      {role:"user",content:prompt}
+    ]
+  });
+
+  const headers={"Content-Type":"application/json","Authorization":`Bearer ${GROQ_KEY}`};
+
+  // Try 1: Direct (works when opened as file://)
+  try{
+    const r=await fetch("https://api.groq.com/openai/v1/chat/completions",{method:"POST",headers,body});
+    if(r.ok){
+      const d=await r.json();
+      const txt=d.choices?.[0]?.message?.content||"{}";
+      return JSON.parse(txt.replace(/```json|```/g,"").trim());
+    }
+  }catch{}
+
+  // Try 2: allorigins proxy
+  try{
+    const target=encodeURIComponent("https://api.groq.com/openai/v1/chat/completions");
+    const r=await fetch(`https://api.allorigins.win/raw?url=${target}`,{method:"POST",headers:{...headers,"X-Requested-With":"XMLHttpRequest"},body});
+    if(r.ok){
+      const d=await r.json();
+      const txt=d.choices?.[0]?.message?.content||"{}";
+      return JSON.parse(txt.replace(/```json|```/g,"").trim());
+    }
+  }catch{}
+
+  // Try 3: corsproxy.io
+  try{
+    const r=await fetch("https://corsproxy.io/?https://api.groq.com/openai/v1/chat/completions",{method:"POST",headers,body});
+    if(r.ok){
+      const d=await r.json();
+      const txt=d.choices?.[0]?.message?.content||"{}";
+      return JSON.parse(txt.replace(/```json|```/g,"").trim());
+    }
+  }catch{}
+
+  // Try 4: cors-anywhere (ถ้าเคยขอ access แล้ว)
+  try{
+    const r=await fetch("https://cors-anywhere.herokuapp.com/https://api.groq.com/openai/v1/chat/completions",{method:"POST",headers:{...headers,"X-Requested-With":"XMLHttpRequest"},body});
+    if(r.ok){
+      const d=await r.json();
+      const txt=d.choices?.[0]?.message?.content||"{}";
+      return JSON.parse(txt.replace(/```json|```/g,"").trim());
+    }
+  }catch{}
+
+  return null;
+}
+
+// ─── MAIN APP ─────────────────────────────────
 function App(){
   const[tab,setTab]=useState("alpha");
   const[scanPhase,setScanPhase]=useState("idle");
@@ -113,20 +191,24 @@ function App(){
   const[sqLoad,setSqLoad]=useState(false);
   const[sqAI,setSqAI]=useState("");
   const[sqAILoad,setSqAILoad]=useState(false);
+  const[groqStatus,setGroqStatus]=useState("unknown"); // unknown|ok|blocked
   const inputRef=useRef();
 
-  // Load quotes on start
   useEffect(()=>{
     (async()=>{
       const tix=["NKE","SOFI","OXY","GLD","IBIT","NVDA","TSLA","SPY","AAPL","AMD","PLTR","BA","LLY","MRNA","PYPL","GS"];
       const res=await Promise.all(tix.map(async t=>[t,await getQ(t)]));
       const m={};res.forEach(([t,q])=>{if(q)m[t]=q;});setQuotes(m);
+      // Test Groq connection
+      if(GROQ_KEY){
+        const test=await callAI('Reply with only this JSON: {"ok":true}');
+        setGroqStatus(test?"ok":"blocked");
+      }
     })();
   },[]);
 
   useEffect(()=>{if(tab==="earnings"&&earnings.length===0){setEarnLoad(true);getEarnings().then(e=>{setEarnings(e);setEarnLoad(false);});}},[tab]);
 
-  // Alpha scan
   const runScan=async()=>{
     setScanPhase("scanning");setScanProg(0);setPicks([]);setPickOpen(null);
     const found=[];
@@ -138,15 +220,18 @@ function App(){
         if(!q)continue;
         const nText=news.map(n=>n.h).join(" | ")||"No news";
         const rText=rec?`StrongBuy:${rec.strongBuy} Buy:${rec.buy} Hold:${rec.hold} Sell:${rec.sell}`:"N/A";
-        const res=await callAI(`Options trader scanning for opportunity.
+        const res=await callAI(`Options trader scanning for today's opportunity.
 Ticker: ${t} (${SECTOR[t]||"Stock"}) | Price: $${q.price} | Change: ${q.change}%
 Analyst: ${rText} | News (3 days): ${nText}
-Reply ONLY JSON: {"confidence":number,"signal":"Bullish|Bearish|Neutral","catalyst":"short phrase","strategy":"options strategy","headline":"one sentence why interesting today","interesting":true|false}
-interesting=true ONLY if confidence>=65 AND (real news catalyst OR price change >2% or <-2%).`);
-        if(res&&res.interesting)found.push({t,sec:SECTOR[t]||"Stock",q,news,rec,r:res});
+Reply ONLY valid JSON: {"confidence":number,"signal":"Bullish|Bearish|Neutral","catalyst":"short phrase","strategy":"options strategy name","headline":"one sentence why interesting today","interesting":true_or_false}
+Set interesting=true ONLY if confidence>=65 AND there is real news catalyst or price move >2% or <-2%.`);
+        if(res&&res.interesting){
+          found.push({t,sec:SECTOR[t]||"Stock",q,news,rec,r:res});
+          setGroqStatus("ok");
+        }
         setQuotes(m=>({...m,[t]:q}));
       }catch{}
-      if(i<SCAN_TICKERS.length-1)await new Promise(r=>setTimeout(r,350));
+      if(i<SCAN_TICKERS.length-1)await new Promise(r=>setTimeout(r,300));
     }
     found.sort((a,b)=>(b.r?.confidence||0)-(a.r?.confidence||0));
     setPicks(found);setScanPhase("done");setLastScan(new Date());
@@ -161,14 +246,14 @@ interesting=true ONLY if confidence>=65 AND (real news catalyst OR price change 
   const runPickAI=async(pick)=>{
     setPickAILoad(p=>({...p,[pick.t]:true}));
     const q=quotes[pick.t];const iv=IV_MAP[pick.t]||{};const u=pickUpg[pick.t];
-    const r=await callAI(`Expert options trader. Full trade plan for ${pick.t} (${pick.sec}):
-Catalyst: "${pick.r?.headline}" | Live price: $${q?.price||"N/A"} (${q?.change||"0"}%)
-IV Rank: ${iv.r||"N/A"}/100 | Suggested: ${pick.r?.strategy}
+    const r=await callAI(`Expert options trader. Full trade plan for ${pick.t}:
+Catalyst: "${pick.r?.headline}"
+Price: $${q?.price||"N/A"} (${q?.change||"0"}%) | IV Rank: ${iv.r||"N/A"}/100 | Strategy: ${pick.r?.strategy}
 Analyst: ${u?`StrongBuy:${u.strongBuy} Buy:${u.buy} Hold:${u.hold} Sell:${u.sell}`:"N/A"}
 News: ${(pickNews[pick.t]||[]).slice(0,2).map(n=>n.h).join(" | ")||"N/A"}
-Reply as plain text (not JSON): 1)Why this confidence? 2)Exact entry strikes & expiry 3)Profit target 4)Stop loss 5)Key risk 6)Enter now or wait? Max 200 words, use bullet points.`);
-    setPickAI(p=>({...p,[pick.t]:typeof r==="string"?r:r?.headline||JSON.stringify(r)}));
-    setPickAILoad(p=>({...p,[pick.t]:false}));
+Reply as plain text bullet points (NOT JSON): 1)Why this confidence? 2)Exact strikes & expiry 3)Profit target 4)Stop loss 5)Key risk 6)Enter now or wait? Max 200 words.`);
+    const txt=typeof r==="string"?r:(r&&typeof r==="object"?JSON.stringify(r):"AI ไม่ตอบกลับ — ลองใหม่อีกครั้ง");
+    setPickAI(p=>({...p,[pick.t]:txt}));setPickAILoad(p=>({...p,[pick.t]:false}));
   };
 
   const doSearch=async()=>{
@@ -181,67 +266,78 @@ Reply as plain text (not JSON): 1)Why this confidence? 2)Exact entry strikes & e
   const doSearchAI=async()=>{
     if(!sqRes)return;setSqAILoad(true);setSqAI("");
     const t=sqRes.ticker;const iv=IV_MAP[t]||{};
-    const r=await callAI(`Expert options trader. Real-time analysis for ${t}:
-Live price: $${sqRes.price} | Change: ${sqRes.change}% | High: $${sqRes.high} | Low: $${sqRes.low}
-IV Rank: ${iv.r||"N/A"}/100 | IV: ${iv.iv||"N/A"}%
-Analyst: ${sqRec?`StrongBuy:${sqRec.strongBuy} Buy:${sqRec.buy} Hold:${sqRec.hold} Sell:${sqRec.sell}`:"N/A"}
+    const r=await callAI(`Expert options trader. Analyze ${t} right now:
+Price: $${sqRes.price} | Change: ${sqRes.change}% | High: $${sqRes.high} | Low: $${sqRes.low}
+IV Rank: ${iv.r||"N/A"}/100 | Analyst: ${sqRec?`Buy:${sqRec.buy} Hold:${sqRec.hold} Sell:${sqRec.sell}`:"N/A"}
 News: ${sqNews.slice(0,2).map(n=>n.h).join(" | ")||"N/A"}
-Reply as plain text (not JSON): 1)Interesting for options today? 2)Best strategy with strikes & expiry 3)Key risk. Max 150 words, bullet points.`);
-    setSqAI(typeof r==="string"?r:r?.headline||"");setSqAILoad(false);
+Reply as plain text bullet points (NOT JSON): 1)Interesting for options today? 2)Best strategy with strikes & expiry 3)Key risk. Max 150 words.`);
+    const txt=typeof r==="string"?r:(r&&typeof r==="object"?JSON.stringify(r):"AI ไม่ตอบกลับ — ลองใหม่");
+    setSqAI(txt);setSqAILoad(false);
   };
 
   const runMacroAI=async()=>{
     setMacroAILoad(true);setMacroAI("");
     const isGold=macroAsset==="gold";
-    const asset=isGold?"Gold (GLD ETF)":"Bitcoin (IBIT ETF)";
     const q=isGold?quotes["GLD"]:quotes["IBIT"];
-    const r=await callAI(`Expert macro options trader. Analyze ${asset}:
+    const r=await callAI(`Macro options trader. Analyze ${isGold?"Gold (GLD)":"Bitcoin (IBIT)"}:
 Price: $${q?.price||"N/A"} | Change: ${q?.change||"N/A"}%
-DXY: ${MACRO.dxy.value} (${MACRO.dxy.trend}) | Fed Rate: 4.25-4.50% (Hold→Cut Q3) | Real Yields: ${MACRO.realYield.value} (${MACRO.realYield.trend})
-${isGold?`VIX: ${MACRO.vix.value} (${MACRO.vix.trend})`:`Fear & Greed: ${MACRO.fearGreed.value} (${MACRO.fearGreed.label}) | BTC Dominance: ${MACRO.btcDom.value}`}
-Reply as plain text: 1)Macro bias + confidence 2)Top 2 drivers 3)Best options strategy with strikes & expiry 4)Key risk 5)30-day target. Bullet points, max 200 words.`);
-    setMacroAI(typeof r==="string"?r:r?.headline||"");setMacroAILoad(false);
+DXY: ${MACRO.dxy.value} (${MACRO.dxy.trend}) | Fed: 4.25-4.50% (Hold→Cut Q3) | Real Yields: ${MACRO.realYield.value} (${MACRO.realYield.trend})
+${isGold?`VIX: ${MACRO.vix.value}`:`Fear & Greed: ${MACRO.fearGreed.value} (${MACRO.fearGreed.label}) | BTC Dom: ${MACRO.btcDom.value}`}
+Reply as plain text bullet points (NOT JSON): 1)Macro bias + confidence% 2)Top 2 key drivers 3)Best options strategy with strikes & expiry 4)Key risk 5)30-day price target. Max 200 words.`);
+    const txt=typeof r==="string"?r:(r&&typeof r==="object"?JSON.stringify(r):"AI ไม่ตอบกลับ");
+    setMacroAI(txt);setMacroAILoad(false);
   };
 
   const runStratAI=async()=>{
     setStratAILoad(true);setStratAI("");
     const s=STRATEGIES[stratN];const q=quotes[stratT];const iv=IV_MAP[stratT]||{};
-    const r=await callAI(`Expert options trader. Evaluate ${stratN} on ${stratT}:
-Price: $${q?.price||"N/A"} | Change: ${q?.change||"0"}% | IV Rank: ${iv.r||"N/A"}/100
-Strategy bias: ${s.bias} | IV preference: ${s.iv}
-Reply as plain text: 1)Fit: Excellent/Good/Poor + reason 2)Exact strikes & expiry 3)Max profit scenario 4)Stop loss 5)Adjustment tip. Bullet points, max 180 words.`);
-    setStratAI(typeof r==="string"?r:r?.headline||"");setStratAILoad(false);
+    const r=await callAI(`Options trader. Evaluate ${stratN} on ${stratT}:
+Price: $${q?.price||"N/A"} (${q?.change||"0"}%) | IV Rank: ${iv.r||"N/A"}/100 | Bias: ${s.bias}
+Reply as plain text bullet points (NOT JSON): 1)Fit: Excellent/Good/Poor + reason 2)Exact strikes & expiry 3)Max profit scenario 4)Stop loss level 5)Adjustment tip. Max 180 words.`);
+    const txt=typeof r==="string"?r:(r&&typeof r==="object"?JSON.stringify(r):"AI ไม่ตอบกลับ");
+    setStratAI(txt);setStratAILoad(false);
   };
 
   const shown=catFilter==="all"?picks:catFilter==="bullish"?picks.filter(p=>p.r?.signal==="Bullish"):picks.filter(p=>p.r?.signal==="Bearish");
   const flowShown=flowFilter==="all"?UNUSUAL_FLOW:flowFilter==="calls"?UNUSUAL_FLOW.filter(f=>f.type==="Call"):UNUSUAL_FLOW.filter(f=>f.type==="Put");
   const strat=STRATEGIES[stratN];const sq2=quotes[stratT];const siv=IV_MAP[stratT];
   const today=new Date().toLocaleDateString("th-TH",{weekday:"long",day:"numeric",month:"long",year:"numeric"});
-  const liveCount=Object.values(quotes).filter(q=>q?.ok).length;
-
   const T=({id,label,badge})=><button onClick={()=>setTab(id)} style={{padding:"9px 14px",fontSize:13,fontWeight:tab===id?700:400,border:"none",borderBottom:tab===id?"3px solid #854F0B":"3px solid transparent",background:"none",cursor:"pointer",color:tab===id?"#854F0B":"#6b7280",display:"flex",alignItems:"center",gap:5,whiteSpace:"nowrap"}}>{label}{badge&&<span style={{background:"#FCEBEB",color:"#A32D2D",fontSize:10,padding:"1px 5px",borderRadius:10,fontWeight:700}}>{badge}</span>}</button>;
 
   return(
     <div style={{maxWidth:960,margin:"0 auto"}}>
 
-      {/* ── HEADER ── */}
+      {/* HEADER */}
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:16,flexWrap:"wrap",gap:8}}>
         <div>
           <h1 style={{fontSize:22,fontWeight:700,marginBottom:3}}>⚡ AI Options Dashboard</h1>
-          <div style={{fontSize:12,color:"#6b7280"}}>{today} · Finnhub Live · Groq AI</div>
+          <div style={{fontSize:12,color:"#6b7280"}}>{today}</div>
         </div>
         <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
-          {liveCount>0&&<span style={{fontSize:11,background:"#EAF3DE",color:"#3B6D11",padding:"3px 8px",borderRadius:6,fontWeight:600}}>Finnhub Live {liveCount} tickers</span>}
+          <Bdg c={Object.keys(quotes).length>0?"green":"gray"} ch={`Finnhub ${Object.keys(quotes).length} tickers`}/>
+          <Bdg c={groqStatus==="ok"?"green":groqStatus==="blocked"?"red":"gray"} ch={groqStatus==="ok"?"Groq AI ✓":groqStatus==="blocked"?"Groq CORS ✗":"Groq ?"}/>
           {lastScan&&<span style={{fontSize:11,color:"#6b7280"}}>สแกน: {lastScan.toLocaleTimeString("th-TH")}</span>}
         </div>
       </div>
 
-      {/* ── SEARCH BAR ── */}
+      {/* GROQ STATUS WARNING */}
+      {groqStatus==="blocked"&&(
+        <div style={{background:"#FCEBEB",borderRadius:10,padding:"12px 16px",marginBottom:14,border:"1px solid #F09595"}}>
+          <div style={{fontSize:13,fontWeight:700,color:"#A32D2D",marginBottom:4}}>⚠️ Groq API ถูก block โดย CORS</div>
+          <div style={{fontSize:12,color:"#A32D2D",lineHeight:1.7}}>
+            GitHub Pages ไม่อนุญาตให้เรียก Groq โดยตรง<br/>
+            <strong>วิธีแก้ง่ายที่สุด:</strong> ไปที่ <a href="https://cors-anywhere.herokuapp.com/corsdemo" target="_blank" style={{color:"#A32D2D",fontWeight:700,textDecoration:"underline"}}>cors-anywhere.herokuapp.com/corsdemo</a> → กด "Request temporary access" → กลับมากดสแกนใหม่<br/>
+            <strong>วิธีถาวร:</strong> ย้ายไป <a href="https://netlify.com" target="_blank" style={{color:"#A32D2D",fontWeight:700,textDecoration:"underline"}}>Netlify.com</a> (ฟรี drag & drop — ไม่มีปัญหา CORS)
+          </div>
+        </div>
+      )}
+
+      {/* SEARCH BAR */}
       <div className="card" style={{background:"#fff",borderRadius:12,padding:16,marginBottom:16,border:"1px solid #e5e7eb"}}>
         <div style={{fontWeight:700,marginBottom:10,fontSize:14}}>🔍 ค้นหาหุ้นใดก็ได้ — ราคาจริง + ข่าวจริง + AI วิเคราะห์</div>
         <div style={{display:"flex",gap:8}}>
           <input ref={inputRef} value={sq} onChange={e=>setSq(e.target.value.toUpperCase())} onKeyDown={e=>e.key==="Enter"&&doSearch()}
-            placeholder="พิมพ์ ticker: NKE, SOFI, OXY, TSM, AMZN..." className="inp"
+            placeholder="พิมพ์ ticker: NKE, SOFI, OXY, TSM..." className="inp"
             style={{flex:1,fontSize:14,padding:"10px 14px",borderRadius:8,border:"1px solid #d1d5db",outline:"none"}}/>
           <button onClick={doSearch} disabled={sqLoad||!sq.trim()} style={{padding:"10px 20px",fontSize:13,fontWeight:700,borderRadius:8,border:"none",background:"#E6F1FB",color:"#185FA5",cursor:"pointer",opacity:sqLoad||!sq.trim()?0.5:1}}>
             {sqLoad?"โหลด...":"ค้นหา →"}
@@ -253,7 +349,6 @@ Reply as plain text: 1)Fit: Excellent/Good/Poor + reason 2)Exact strikes & expir
               <span style={{fontSize:20,fontWeight:700}}>{sqRes.ticker}</span>
               <span style={{fontSize:22,fontWeight:700,color:parseFloat(sqRes.change)>=0?"#3B6D11":"#A32D2D"}}>${sqRes.price}</span>
               <Bdg c={parseFloat(sqRes.change)>=0?"green":"red"} ch={`${parseFloat(sqRes.change)>=0?"+":""}${sqRes.change}%`}/>
-              <Bdg c="green" ch="Finnhub Live"/>
               <button onClick={()=>{setSqRes(null);setSq("");setSqAI("");}} style={{marginLeft:"auto",fontSize:12,padding:"4px 10px",borderRadius:8,border:"1px solid #e5e7eb",background:"none",cursor:"pointer",color:"#6b7280"}}>✕</button>
             </div>
             <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8,marginBottom:10}}>
@@ -265,37 +360,37 @@ Reply as plain text: 1)Fit: Excellent/Good/Poor + reason 2)Exact strikes & expir
               ))}
             </div>
             {sqRec&&<div style={{marginBottom:10,padding:"10px 12px",background:"#f9fafb",borderRadius:8}} className="sub">
-              <div style={{fontSize:11,fontWeight:600,marginBottom:5,color:"#6b7280"}}>Analyst Consensus — Finnhub Real ({sqRec.period})</div>
+              <div style={{fontSize:11,fontWeight:700,marginBottom:5,color:"#6b7280"}}>Analyst Consensus — Finnhub ({sqRec.period})</div>
               <div style={{display:"flex",gap:6,flexWrap:"wrap"}}><Bdg c="teal" ch={`StrongBuy: ${sqRec.strongBuy}`}/><Bdg c="green" ch={`Buy: ${sqRec.buy}`}/><Bdg c="gray" ch={`Hold: ${sqRec.hold}`}/><Bdg c="red" ch={`Sell: ${sqRec.sell}`}/></div>
             </div>}
             <button onClick={doSearchAI} disabled={sqAILoad} style={{width:"100%",padding:"10px",fontSize:13,fontWeight:700,borderRadius:8,border:"1px solid #0F6E56",background:"#E1F5EE",color:"#0F6E56",cursor:"pointer",marginBottom:sqAI?12:0,opacity:sqAILoad?0.6:1}}>
-              {sqAILoad?"AI กำลังวิเคราะห์...":"🤖 AI วิเคราะห์ "+sqRes.ticker+" ตอนนี้ →"}
+              {sqAILoad?"AI กำลังวิเคราะห์...":"🤖 AI วิเคราะห์ "+sqRes.ticker+" →"}
             </button>
-            {sqAI&&<div style={{background:"#E1F5EE",borderRadius:9,padding:14,marginBottom:10,borderLeft:"4px solid #0F6E56"}}><div style={{fontSize:12,fontWeight:700,marginBottom:6,color:"#0F6E56"}}>AI Analysis — {sqRes.ticker} at ${sqRes.price}</div><div style={{fontSize:13,lineHeight:1.9,whiteSpace:"pre-wrap"}}>{sqAI}</div></div>}
+            {sqAI&&<div style={{background:"#E1F5EE",borderRadius:9,padding:14,marginBottom:10,borderLeft:"4px solid #0F6E56"}}><div style={{fontSize:12,fontWeight:700,marginBottom:6,color:"#0F6E56"}}>AI Analysis — {sqRes.ticker}</div><div style={{fontSize:13,lineHeight:1.9,whiteSpace:"pre-wrap"}}>{sqAI}</div></div>}
             {sqNews.length>0&&<div><div style={{fontSize:11,fontWeight:700,marginBottom:6,color:"#6b7280"}}>ข่าวล่าสุด — Finnhub</div>{sqNews.slice(0,4).map((n,i)=>(<a key={i} href={n.url} target="_blank" rel="noreferrer" style={{display:"block",padding:"7px 0",borderBottom:i<3?"1px solid #f3f4f6":"none"}}><div style={{fontSize:13,fontWeight:500,marginBottom:1}}>{n.h}</div><div style={{fontSize:11,color:"#9ca3af"}}>{n.src} · {n.dt}</div></a>))}</div>}
           </div>
         )}
       </div>
 
-      {/* ── TABS ── */}
+      {/* TABS */}
       <div style={{display:"flex",borderBottom:"1px solid #e5e7eb",marginBottom:18,overflowX:"auto",background:"#fff",borderRadius:"10px 10px 0 0",padding:"0 8px"}} className="card">
         <T id="alpha" label="⚡ Alpha Seeker" badge={picks.length||null}/>
         <T id="macro" label="🥇 Gold & BTC"/>
         <T id="scanner" label="📊 IV Scanner"/>
         <T id="flow" label="🔔 Flow Alerts" badge={UNUSUAL_FLOW.length}/>
-        <T id="strategy" label="💡 Strategy Builder"/>
+        <T id="strategy" label="💡 Strategy"/>
         <T id="earnings" label="📅 Earnings"/>
       </div>
 
-      {/* ══ ALPHA SEEKER ══ */}
+      {/* ══ ALPHA ══ */}
       {tab==="alpha"&&(<div>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12,flexWrap:"wrap",gap:8}}>
           <div>
             <div style={{fontSize:15,fontWeight:700,marginBottom:2}}>⚡ Alpha Seeker — Real-time Catalyst Scanner</div>
-            <div style={{fontSize:12,color:"#6b7280"}}>Claude อ่านข่าว Finnhub 3 วันล่าสุด วิเคราะห์ทุก ticker อัตโนมัติ</div>
+            <div style={{fontSize:12,color:"#6b7280"}}>ดึงข่าว Finnhub 3 วัน → Groq AI วิเคราะห์ → คัดเฉพาะที่มี catalyst จริง</div>
           </div>
           <button onClick={runScan} disabled={scanPhase==="scanning"} style={{padding:"9px 20px",fontSize:13,fontWeight:700,borderRadius:8,border:"none",background:"#FAEEDA",color:"#854F0B",cursor:scanPhase==="scanning"?"not-allowed":"pointer",opacity:scanPhase==="scanning"?0.5:1}}>
-            {scanPhase==="scanning"?`กำลังสแกน ${scanCur}...`:"🔄 สแกนใหม่วันนี้"}
+            {scanPhase==="scanning"?`สแกน ${scanCur}... ${scanProg}%`:"🔄 สแกนใหม่วันนี้"}
           </button>
         </div>
 
@@ -306,14 +401,20 @@ Reply as plain text: 1)Fit: Excellent/Good/Poor + reason 2)Exact strikes & expir
               <span style={{fontSize:14,fontWeight:700,color:"#854F0B"}}>{scanProg}%</span>
             </div>
             <div style={{height:10,background:"#F5E6C8",borderRadius:5,overflow:"hidden"}}><div style={{width:`${scanProg}%`,height:"100%",background:"#854F0B",borderRadius:5,transition:"width 0.3s"}}/></div>
-            <div style={{fontSize:11,color:"#854F0B",marginTop:6}}>ดึงข่าว Finnhub → Groq AI วิเคราะห์ → คัดเฉพาะที่มี catalyst จริง</div>
+            <div style={{fontSize:11,color:"#854F0B",marginTop:6}}>Finnhub ดึงข่าวจริง → Groq AI อ่านและให้คะแนน → แสดงเฉพาะ confidence ≥65</div>
           </div>
         )}
 
         {scanPhase==="idle"&&(
           <div style={{background:"#E6F1FB",borderRadius:10,padding:"14px 16px",marginBottom:14}}>
-            <div style={{fontSize:13,fontWeight:700,color:"#185FA5",marginBottom:4}}>วิธีใช้ Alpha Seeker</div>
-            <div style={{fontSize:12,color:"#185FA5",lineHeight:1.8}}>1. กด "สแกนใหม่วันนี้" ทุกเช้า<br/>2. รอ progress bar เต็ม (~2 นาที)<br/>3. Claude จะแสดงเฉพาะหุ้นที่มีข่าวน่าสนใจวันนี้<br/>4. คลิกการ์ดเพื่อดูรายละเอียด + AI Trade Plan</div>
+            <div style={{fontSize:13,fontWeight:700,color:"#185FA5",marginBottom:4}}>📋 วิธีใช้ Alpha Seeker</div>
+            <div style={{fontSize:12,color:"#185FA5",lineHeight:1.8}}>
+              1. กด "สแกนใหม่วันนี้" ทุกเช้า<br/>
+              2. รอ progress bar เต็ม (~2-3 นาที)<br/>
+              3. Claude/Groq จะแสดงเฉพาะหุ้นที่มีข่าวน่าสนใจวันนี้<br/>
+              4. คลิกการ์ดเพื่อดูรายละเอียด + AI Trade Plan<br/>
+              5. ถ้าขึ้น Groq CORS ✗ → ไปที่ <a href="https://netlify.com" target="_blank" style={{color:"#185FA5",fontWeight:700}}>Netlify.com</a> แล้ว drag & drop ไฟล์นี้ (ฟรี ไม่มีปัญหา CORS)
+            </div>
           </div>
         )}
 
@@ -326,7 +427,17 @@ Reply as plain text: 1)Fit: Excellent/Good/Poor + reason 2)Exact strikes & expir
               ))}
             </div>
           </div>
-          {picks.length===0&&<div style={{textAlign:"center",padding:50,background:"#fff",borderRadius:12,border:"1px solid #e5e7eb"}} className="card"><div style={{fontSize:36,marginBottom:12}}>🔍</div><div style={{fontSize:14,fontWeight:700,marginBottom:6}}>ไม่พบ catalyst น่าสนใจวันนี้</div><div style={{fontSize:12,color:"#6b7280",marginBottom:16}}>ตลาดเงียบ หรือ Groq/Finnhub rate limit<br/>รอ 1 นาทีแล้วกดสแกนใหม่</div><button onClick={runScan} style={{padding:"10px 24px",fontSize:13,fontWeight:700,borderRadius:8,border:"none",background:"#FAEEDA",color:"#854F0B",cursor:"pointer"}}>🔄 สแกนใหม่</button></div>}
+          {picks.length===0&&<div style={{textAlign:"center",padding:50,background:"#fff",borderRadius:12,border:"1px solid #e5e7eb"}} className="card">
+            <div style={{fontSize:36,marginBottom:12}}>🔍</div>
+            <div style={{fontSize:14,fontWeight:700,marginBottom:6}}>ไม่พบ catalyst น่าสนใจวันนี้</div>
+            <div style={{fontSize:12,color:"#6b7280",marginBottom:4}}>อาจเกิดจาก:</div>
+            <div style={{fontSize:12,color:"#6b7280",marginBottom:16,lineHeight:1.8,textAlign:"left",maxWidth:400,margin:"0 auto 16px"}}>
+              1. Groq CORS blocked → ดูที่ badge มุมบนขวา<br/>
+              2. Finnhub rate limit → รอ 1 นาทีแล้วลองใหม่<br/>
+              3. ตลาดเงียบจริงๆ ไม่มี catalyst วันนี้
+            </div>
+            <button onClick={runScan} style={{padding:"10px 24px",fontSize:13,fontWeight:700,borderRadius:8,border:"none",background:"#FAEEDA",color:"#854F0B",cursor:"pointer"}}>🔄 สแกนใหม่</button>
+          </div>}
         </>)}
 
         {shown.map((item,idx)=>{
@@ -335,47 +446,33 @@ Reply as plain text: 1)Fit: Excellent/Good/Poor + reason 2)Exact strikes & expir
             <div onClick={()=>openPick(t)} style={{padding:"14px 16px",cursor:"pointer",display:"flex",gap:12,alignItems:"flex-start"}}>
               <Arc score={r.confidence}/>
               <div style={{flex:1,minWidth:0}}>
-                <div style={{display:"flex",gap:6,alignItems:"center",flexWrap:"wrap",marginBottom:5}}>
-                  <span style={{fontWeight:700,fontSize:16}}>{t}</span>
-                  <Bdg c="gray" ch={sec}/><Bdg c={sigC} ch={r.signal}/>
-                  {idx===0&&<Bdg c="amber" ch="🏆 Top Pick"/>}
-                </div>
+                <div style={{display:"flex",gap:6,alignItems:"center",flexWrap:"wrap",marginBottom:5}}><span style={{fontWeight:700,fontSize:16}}>{t}</span><Bdg c="gray" ch={sec}/><Bdg c={sigC} ch={r.signal}/>{idx===0&&<Bdg c="amber" ch="🏆 Top Pick"/>}</div>
                 <div style={{fontSize:13,lineHeight:1.6,fontWeight:500,marginBottom:5}}>{r.headline}</div>
-                <div style={{display:"flex",gap:6,marginBottom:5,flexWrap:"wrap"}}>
-                  <Bdg c="purple" ch={`📌 ${r.catalyst}`}/><Bdg c="blue" ch={`💡 ${r.strategy}`}/>
-                </div>
-                <div style={{display:"flex",gap:16,flexWrap:"wrap"}}>
-                  <span style={{fontSize:13}}>ราคา <strong style={{color:pos?"#3B6D11":"#A32D2D"}}>${q.price} ({pos?"+":""}{q.change}%)</strong></span>
-                  {rec&&<span style={{fontSize:12,color:"#6b7280"}}>Buy:{rec.buy} Hold:{rec.hold} Sell:{rec.sell}</span>}
-                </div>
+                <div style={{display:"flex",gap:6,marginBottom:5,flexWrap:"wrap"}}><Bdg c="purple" ch={`📌 ${r.catalyst}`}/><Bdg c="blue" ch={`💡 ${r.strategy}`}/></div>
+                <div style={{display:"flex",gap:16,flexWrap:"wrap"}}><span style={{fontSize:13}}>ราคา <strong style={{color:pos?"#3B6D11":"#A32D2D"}}>${q.price} ({pos?"+":""}{q.change}%)</strong></span>{rec&&<span style={{fontSize:12,color:"#6b7280"}}>Buy:{rec.buy} Hold:{rec.hold} Sell:{rec.sell}</span>}</div>
               </div>
               <span style={{fontSize:20,color:"#9ca3af",flexShrink:0}}>{isOpen?"▲":"▼"}</span>
             </div>
             {isOpen&&(<div className="sub" style={{borderTop:"1px solid #f3f4f6",padding:"14px 16px",background:"#f9fafb"}}>
               <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8,marginBottom:12}}>
-                {[["ราคา",`$${q.price}`],["High",`$${q.high}`],["Low",`$${q.low}`]].map(([l,v])=>(
-                  <div key={l} style={{background:"#fff",borderRadius:8,padding:"8px 12px",border:"1px solid #e5e7eb"}}><div style={{fontSize:10,color:"#9ca3af",marginBottom:2}}>{l}</div><div style={{fontSize:15,fontWeight:700}}>{v}</div></div>
-                ))}
+                {[["ราคา",`$${q.price}`],["High",`$${q.high}`],["Low",`$${q.low}`]].map(([l,v])=>(<div key={l} style={{background:"#fff",borderRadius:8,padding:"8px 12px",border:"1px solid #e5e7eb"}}><div style={{fontSize:10,color:"#9ca3af",marginBottom:2}}>{l}</div><div style={{fontSize:15,fontWeight:700}}>{v}</div></div>))}
               </div>
-              {pickUpg[t]&&<div style={{marginBottom:12,padding:"10px 12px",background:"#fff",borderRadius:8,border:"1px solid #e5e7eb"}}>
-                <div style={{fontSize:11,fontWeight:700,marginBottom:5,color:"#6b7280"}}>Analyst Consensus — Finnhub ({pickUpg[t].period})</div>
-                <div style={{display:"flex",gap:6,flexWrap:"wrap"}}><Bdg c="teal" ch={`StrongBuy: ${pickUpg[t].strongBuy}`}/><Bdg c="green" ch={`Buy: ${pickUpg[t].buy}`}/><Bdg c="gray" ch={`Hold: ${pickUpg[t].hold}`}/><Bdg c="red" ch={`Sell: ${pickUpg[t].sell}`}/></div>
-              </div>}
+              {pickUpg[t]&&<div style={{marginBottom:12,padding:"10px 12px",background:"#fff",borderRadius:8,border:"1px solid #e5e7eb"}}><div style={{fontSize:11,fontWeight:700,marginBottom:5,color:"#6b7280"}}>Analyst — Finnhub ({pickUpg[t].period})</div><div style={{display:"flex",gap:6,flexWrap:"wrap"}}><Bdg c="teal" ch={`StrongBuy: ${pickUpg[t].strongBuy}`}/><Bdg c="green" ch={`Buy: ${pickUpg[t].buy}`}/><Bdg c="gray" ch={`Hold: ${pickUpg[t].hold}`}/><Bdg c="red" ch={`Sell: ${pickUpg[t].sell}`}/></div></div>}
               <div style={{marginBottom:12,padding:"12px 14px",background:r.signal==="Bullish"?"#EAF3DE":r.signal==="Bearish"?"#FCEBEB":"#F1EFE8",borderRadius:8,borderLeft:`4px solid ${r.signal==="Bullish"?"#639922":r.signal==="Bearish"?"#E24B4A":"#888"}`}}>
-                <div style={{fontSize:12,fontWeight:700,marginBottom:4,color:r.signal==="Bullish"?"#3B6D11":r.signal==="Bearish"?"#A32D2D":"#5F5E5A"}}>AI Strategy — Confidence {r.confidence}/100 {r.confidence>=80?"🟢 แข็งแกร่ง":r.confidence>=65?"🟡 ปานกลาง":"🔴 อ่อน"}</div>
+                <div style={{fontSize:12,fontWeight:700,marginBottom:4,color:r.signal==="Bullish"?"#3B6D11":r.signal==="Bearish"?"#A32D2D":"#5F5E5A"}}>AI Strategy — Confidence {r.confidence}/100 {r.confidence>=80?"🟢":"r.confidence>=65"?"🟡":"🔴"}</div>
                 <div style={{fontSize:14,fontWeight:700}}>{r.strategy}</div>
               </div>
               <button onClick={()=>runPickAI(item)} disabled={pickAILoad[t]} style={{padding:"9px 18px",fontSize:13,fontWeight:700,borderRadius:8,border:`1px solid ${r.signal==="Bullish"?"#639922":"#E24B4A"}`,background:r.signal==="Bullish"?"#EAF3DE":"#FCEBEB",color:r.signal==="Bullish"?"#3B6D11":"#A32D2D",cursor:"pointer",marginBottom:12,opacity:pickAILoad[t]?0.6:1}}>
-                {pickAILoad[t]?"AI กำลังวิเคราะห์...":"🤖 Full AI Trade Plan →"}
+                {pickAILoad[t]?"Groq กำลังวิเคราะห์...":"🤖 Full AI Trade Plan →"}
               </button>
               {pickAI[t]&&<div style={{background:"#fff",borderRadius:9,padding:14,marginBottom:12,border:"1px solid #e5e7eb"}}><div style={{fontSize:12,fontWeight:700,marginBottom:6}}>AI Trade Plan — {t}</div><div style={{fontSize:13,lineHeight:1.9,whiteSpace:"pre-wrap"}}>{pickAI[t]}</div></div>}
-              {(pickNews[t]||[]).length>0&&<div><div style={{fontSize:11,fontWeight:700,marginBottom:6,color:"#6b7280"}}>📰 ข่าวจริง Finnhub ที่ใช้วิเคราะห์</div>{(pickNews[t]||[]).map((n,i)=>(<a key={i} href={n.url} target="_blank" rel="noreferrer" style={{display:"block",padding:"6px 0",borderBottom:i<(pickNews[t]||[]).length-1?"1px solid #f3f4f6":"none"}}><div style={{fontSize:12,fontWeight:500,marginBottom:1}}>{n.h}</div><div style={{fontSize:11,color:"#9ca3af"}}>{n.src} · {n.dt}</div></a>))}</div>}
+              {(pickNews[t]||[]).length>0&&<div><div style={{fontSize:11,fontWeight:700,marginBottom:6,color:"#6b7280"}}>📰 ข่าวจริง Finnhub</div>{(pickNews[t]||[]).map((n,i)=>(<a key={i} href={n.url} target="_blank" rel="noreferrer" style={{display:"block",padding:"6px 0",borderBottom:i<(pickNews[t]||[]).length-1?"1px solid #f3f4f6":"none"}}><div style={{fontSize:12,fontWeight:500,marginBottom:1}}>{n.h}</div><div style={{fontSize:11,color:"#9ca3af"}}>{n.src} · {n.dt}</div></a>))}</div>}
             </div>)}
           </div>);
         })}
       </div>)}
 
-      {/* ══ GOLD & BTC MACRO ══ */}
+      {/* ══ MACRO ══ */}
       {tab==="macro"&&(<div>
         <div style={{display:"flex",gap:8,marginBottom:14}}>
           {[["gold","🥇 Gold / GLD","amber"],["btc","₿ Bitcoin / IBIT","purple"]].map(([v,l,c])=>(
@@ -383,15 +480,13 @@ Reply as plain text: 1)Fit: Excellent/Good/Poor + reason 2)Exact strikes & expir
           ))}
         </div>
         <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:10,marginBottom:14}}>
-          {[
-            ["DXY (USD)",MACRO.dxy.value,MACRO.dxy.trend,MACRO.dxy.trend==="Weakening"?"green":"red",MACRO.dxy.note],
-            ["Fed Rate","4.25-4.50%","Hold→Cut Q3","amber","Rate cuts expected Q3 2026"],
+          {[["DXY",MACRO.dxy.value,MACRO.dxy.trend,"green",MACRO.dxy.note],["Fed Rate","4.25-4.50%","Hold→Cut Q3","amber",MACRO.fed.note],
             macroAsset==="gold"?["Real Yields",MACRO.realYield.value,MACRO.realYield.trend,"green",MACRO.realYield.note]:["Fear & Greed",MACRO.fearGreed.value,MACRO.fearGreed.label,"amber",MACRO.fearGreed.note],
             macroAsset==="gold"?["VIX",MACRO.vix.value,MACRO.vix.trend,"amber",MACRO.vix.note]:["BTC Dominance",MACRO.btcDom.value,MACRO.btcDom.trend,"green",MACRO.btcDom.note],
-            ["GLD Price",quotes["GLD"]?.price?`$${quotes["GLD"].price}`:"...",quotes["GLD"]?.change?`${quotes["GLD"].change}%`:"","green","Gold ETF — Finnhub Live"],
-            ["IBIT Price",quotes["IBIT"]?.price?`$${quotes["IBIT"].price}`:"...",quotes["IBIT"]?.change?`${quotes["IBIT"].change}%`:"","purple","Bitcoin ETF — Finnhub Live"],
+            ["GLD",quotes["GLD"]?.price?`$${quotes["GLD"].price}`:"...",quotes["GLD"]?.change||"","green","Gold ETF — Finnhub Live"],
+            ["IBIT",quotes["IBIT"]?.price?`$${quotes["IBIT"].price}`:"...",quotes["IBIT"]?.change||"","purple","Bitcoin ETF — Finnhub Live"],
           ].map(([l,v,sub,col,note],i)=>(
-            <div key={i} className="card sub" style={{background:"#f9fafb",borderRadius:10,padding:"12px 14px",border:"1px solid #e5e7eb"}}>
+            <div key={i} className="sub" style={{background:"#f9fafb",borderRadius:10,padding:"12px 14px",border:"1px solid #e5e7eb"}}>
               <div style={{fontSize:11,color:"#9ca3af",marginBottom:3}}>{l}</div>
               <div style={{fontSize:18,fontWeight:700,color:CLR[col]?.[1]||"#1a1a1a"}}>{v}</div>
               <div style={{fontSize:11,color:"#9ca3af",marginTop:1}}>{sub}</div>
@@ -410,18 +505,18 @@ Reply as plain text: 1)Fit: Excellent/Good/Poor + reason 2)Exact strikes & expir
         </div>
         <div className="card" style={{background:"#fff",borderRadius:12,border:"1px solid #e5e7eb",padding:16}}>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
-            <div style={{fontSize:14,fontWeight:700}}>🤖 AI Macro Analysis — {macroAsset==="gold"?"Gold / GLD":"Bitcoin / IBIT"}</div>
+            <div style={{fontSize:14,fontWeight:700}}>🤖 AI Macro — {macroAsset==="gold"?"Gold / GLD":"Bitcoin / IBIT"}</div>
             <button onClick={runMacroAI} disabled={macroAILoad} style={{padding:"7px 16px",fontSize:12,fontWeight:700,borderRadius:8,border:`1px solid ${macroAsset==="gold"?CLR.amber[1]:CLR.purple[1]}`,background:macroAsset==="gold"?CLR.amber[0]:CLR.purple[0],color:macroAsset==="gold"?CLR.amber[1]:CLR.purple[1],cursor:"pointer",opacity:macroAILoad?0.6:1}}>
-              {macroAILoad?"Groq กำลังวิเคราะห์...":"Run AI Macro →"}
+              {macroAILoad?"กำลังวิเคราะห์...":"Run AI Macro →"}
             </button>
           </div>
-          {macroAI?<div style={{fontSize:13,lineHeight:1.9,whiteSpace:"pre-wrap"}}>{macroAI}</div>:<div style={{fontSize:12,color:"#9ca3af",fontStyle:"italic"}}>กด Run AI Macro เพื่อให้ Groq วิเคราะห์สถานะ macro และแนะนำกลยุทธ์ options</div>}
+          {macroAI?<div style={{fontSize:13,lineHeight:1.9,whiteSpace:"pre-wrap"}}>{macroAI}</div>:<div style={{fontSize:12,color:"#9ca3af",fontStyle:"italic"}}>กด Run AI Macro เพื่อวิเคราะห์สถานะ macro และแนะนำ options strategy</div>}
         </div>
       </div>)}
 
       {/* ══ IV SCANNER ══ */}
       {tab==="scanner"&&(<div>
-        <div style={{fontSize:12,color:"#6b7280",marginBottom:12}}>ราคาจาก Finnhub Live · IV Rank เป็นค่าประมาณ (ต้องการ Tradier API สำหรับข้อมูลจริง) · คลิก ticker เพื่อค้นหา</div>
+        <div style={{fontSize:12,color:"#6b7280",marginBottom:12}}>ราคาจาก Finnhub Live · IV Rank เป็นค่าประมาณ · คลิก ticker เพื่อค้นหาและดูข่าว</div>
         <div className="card" style={{background:"#fff",borderRadius:12,border:"1px solid #e5e7eb",overflow:"hidden"}}>
           <div style={{display:"grid",gridTemplateColumns:"80px 65px 80px 1fr 70px 70px",gap:5,padding:"7px 12px",fontSize:10,color:"#9ca3af",borderBottom:"1px solid #f3f4f6",fontWeight:700,background:"#f9fafb"}}>
             <span>Ticker</span><span>ราคา</span><span>Sector</span><span>IV Rank</span><span>P/C</span><span>Bias</span>
@@ -431,50 +526,46 @@ Reply as plain text: 1)Fit: Excellent/Good/Poor + reason 2)Exact strikes & expir
             const pcr=t==="BA"?0.88:t==="NKE"?0.61:t==="TSLA"?0.91:t==="IBIT"?0.69:t==="GLD"?0.88:t==="NVDA"?0.64:0.80;
             const bias=iv.r>=65?"Bullish":iv.r<=35?"Neutral":"Moderate";
             return(<div key={t} onClick={()=>{setSq(t);setTab("alpha");setTimeout(()=>inputRef.current?.focus(),100);}}
-              style={{display:"grid",gridTemplateColumns:"80px 65px 80px 1fr 70px 70px",gap:5,padding:"8px 12px",borderBottom:"1px solid #f3f4f6",cursor:"pointer",background:"#fff"}} className="card">
+              style={{display:"grid",gridTemplateColumns:"80px 65px 80px 1fr 70px 70px",gap:5,padding:"8px 12px",borderBottom:"1px solid #f3f4f6",cursor:"pointer"}} className="card">
               <div style={{fontWeight:700,fontSize:13}}>{t}</div>
               <div style={{fontSize:12,color:q?parseFloat(q.change)>=0?"#3B6D11":"#A32D2D":"#9ca3af"}}>{q?`$${q.price}`:"—"}</div>
-              <div><span style={{background:["GLD","IBIT"].includes(t)?"#FAEEDA":"#F1EFE8",color:["GLD","IBIT"].includes(t)?"#854F0B":"#5F5E5A",fontSize:10,padding:"1px 6px",borderRadius:5,fontWeight:600}}>{SECTOR[t]||"—"}</span></div>
+              <div><span style={{background:["GLD","IBIT"].includes(t)?"#FAEEDA":"#F1EFE8",color:["GLD","IBIT"].includes(t)?"#854F0B":"#5F5E5A",fontSize:10,padding:"1px 6px",borderRadius:5,fontWeight:600}}>{SECTOR[t]}</span></div>
               <div><div style={{fontSize:10,color:"#9ca3af",marginBottom:2}}>rank {iv.r} · {iv.iv}% IV</div><IVBar v={iv.r}/></div>
               <div style={{fontSize:13,fontWeight:700,color:pcr>1?"#A32D2D":pcr<0.75?"#3B6D11":"#854F0B"}}>{pcr}</div>
               <div><span style={{background:iv.r>=65?"#EAF3DE":"#F1EFE8",color:iv.r>=65?"#3B6D11":"#5F5E5A",fontSize:11,padding:"1px 7px",borderRadius:5,fontWeight:600}}>{bias}</span></div>
             </div>);
           })}
         </div>
-        <div style={{marginTop:8,fontSize:11,color:"#9ca3af"}}>คลิก ticker เพื่อค้นหาและดูข่าวล่าสุด</div>
       </div>)}
 
       {/* ══ FLOW ALERTS ══ */}
       {tab==="flow"&&(<div>
-        <div style={{fontSize:12,color:"#6b7280",marginBottom:10}}>Smart money flow — Vol/OI ratio &gt;3× · Institutional activity · อัปเดตด้วย Unusual Whales API สำหรับข้อมูล real-time</div>
+        <div style={{fontSize:12,color:"#6b7280",marginBottom:10}}>Smart money flow — Vol/OI &gt;3× · Institutional activity alerts</div>
         <div style={{display:"flex",gap:5,marginBottom:12}}>
-          {[["all","ทั้งหมด"],["calls","Calls เท่านั้น"],["puts","Puts เท่านั้น"]].map(([v,l])=>(
+          {[["all","ทั้งหมด"],["calls","Calls"],["puts","Puts"]].map(([v,l])=>(
             <button key={v} onClick={()=>setFlowFilter(v)} style={{fontSize:11,padding:"4px 12px",borderRadius:20,border:"1px solid #e5e7eb",cursor:"pointer",background:flowFilter===v?"#FAEEDA":"#f9fafb",color:flowFilter===v?"#854F0B":"#6b7280",fontWeight:flowFilter===v?700:400}}>{l}</button>
           ))}
         </div>
         <div className="card" style={{background:"#fff",borderRadius:12,border:"1px solid #e5e7eb",overflow:"hidden"}}>
-          <div style={{display:"grid",gridTemplateColumns:"65px 50px 60px 55px 1fr 60px 70px 1fr",gap:5,padding:"7px 12px",fontSize:10,color:"#9ca3af",borderBottom:"1px solid #f3f4f6",fontWeight:700,background:"#f9fafb"}}>
+          <div style={{display:"grid",gridTemplateColumns:"65px 50px 60px 50px 1fr 60px 70px 1fr",gap:5,padding:"7px 12px",fontSize:10,color:"#9ca3af",borderBottom:"1px solid #f3f4f6",fontWeight:700,background:"#f9fafb"}}>
             <span>Ticker</span><span>Type</span><span>Strike</span><span>Expiry</span><span>Volume</span><span>OI</span><span>Vol/OI</span><span>Signal</span>
           </div>
           {flowShown.map((r,i)=>(
-            <div key={i} style={{display:"grid",gridTemplateColumns:"65px 50px 60px 55px 1fr 60px 70px 1fr",gap:5,padding:"9px 12px",borderBottom:"1px solid #f3f4f6",background:"#fff",alignItems:"center"}} className="card">
+            <div key={i} style={{display:"grid",gridTemplateColumns:"65px 50px 60px 50px 1fr 60px 70px 1fr",gap:5,padding:"9px 12px",borderBottom:"1px solid #f3f4f6",alignItems:"center"}} className="card">
               <div style={{fontWeight:700,fontSize:13}}>{r.t}</div>
-              <div><Bdg c={r.type==="Call"?"green":"red"} ch={r.type}/></div>
+              <Bdg c={r.type==="Call"?"green":"red"} ch={r.type}/>
               <div style={{fontSize:12,fontWeight:700}}>${r.strike}</div>
               <div style={{fontSize:11,color:"#9ca3af"}}>{r.exp}</div>
               <div><div style={{fontSize:12,fontWeight:700}}>{fmt(r.vol)}</div><div style={{fontSize:10,color:"#9ca3af"}}>prem ${r.prem}</div></div>
               <div style={{fontSize:12}}>{fmt(r.oi)}</div>
-              <div>
-                <div style={{fontSize:12,fontWeight:700,color:r.ratio>=5?"#A32D2D":"#854F0B"}}>{r.ratio}×</div>
-                <div style={{height:4,background:"#F1EFE8",borderRadius:2,marginTop:3,overflow:"hidden"}}><div style={{width:`${Math.min(100,r.ratio/12*100)}%`,height:"100%",background:r.ratio>=5?"#A32D2D":"#854F0B",borderRadius:2}}/></div>
-              </div>
-              <div style={{fontSize:11,fontWeight:600,color:r.flag.includes("Bullish")?"#3B6D11":r.flag.includes("Bearish")?"#A32D2D":"#854F0B",lineHeight:1.4}}>{r.flag}</div>
+              <div><div style={{fontSize:12,fontWeight:700,color:r.ratio>=5?"#A32D2D":"#854F0B"}}>{r.ratio}×</div><div style={{height:4,background:"#F1EFE8",borderRadius:2,marginTop:3,overflow:"hidden"}}><div style={{width:`${Math.min(100,r.ratio/12*100)}%`,height:"100%",background:r.ratio>=5?"#A32D2D":"#854F0B",borderRadius:2}}/></div></div>
+              <div style={{fontSize:11,fontWeight:600,color:r.flag.includes("Bullish")||r.flag.includes("breakout")||r.flag.includes("momentum")||r.flag.includes("accumulation")||r.flag.includes("upgrade")?"#3B6D11":r.flag.includes("Bearish")||r.flag.includes("hedge")?"#A32D2D":"#854F0B",lineHeight:1.4}}>{r.flag}</div>
             </div>
           ))}
         </div>
       </div>)}
 
-      {/* ══ STRATEGY BUILDER ══ */}
+      {/* ══ STRATEGY ══ */}
       {tab==="strategy"&&(<div>
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:14}}>
           <div>
@@ -492,43 +583,30 @@ Reply as plain text: 1)Fit: Excellent/Good/Poor + reason 2)Exact strikes & expir
             </select>
           </div>
         </div>
-
         <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:10,marginBottom:14}}>
           {Object.entries(STRATEGIES).map(([name,s])=>(
             <div key={name} onClick={()=>setStratN(name)} className="card" style={{border:stratN===name?`2px solid ${CLR[s.color][1]}`:"1px solid #e5e7eb",borderRadius:10,padding:"10px 12px",cursor:"pointer",background:"#fff"}}>
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:5}}>
-                <div style={{fontSize:12,fontWeight:700}}>{name}</div>
-                <Bdg c={s.color} ch={s.bias}/>
+                <div style={{fontSize:12,fontWeight:700}}>{name}</div><Bdg c={s.color} ch={s.bias}/>
               </div>
               <PayoffChart shape={s.payoff} color={s.color}/>
               <div style={{fontSize:10,color:"#9ca3af",marginTop:4}}>{s.iv}</div>
             </div>
           ))}
         </div>
-
         <div className="card" style={{background:"#fff",border:`1px solid ${CLR[strat.color][1]}`,borderRadius:12,padding:16}}>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:12}}>
-            <div>
-              <div style={{fontSize:15,fontWeight:700}}>{stratN} on {stratT}</div>
-              <div style={{fontSize:12,color:"#9ca3af",marginTop:2}}>ราคา: {sq2?`$${sq2.price} (${sq2.change}%)`:"loading..."} · IV Rank: {siv?.r||"—"}/100</div>
-            </div>
+            <div><div style={{fontSize:15,fontWeight:700}}>{stratN} on {stratT}</div><div style={{fontSize:12,color:"#9ca3af",marginTop:2}}>ราคา: {sq2?`$${sq2.price} (${sq2.change}%)`:"loading..."} · IV Rank: {siv?.r||"—"}/100</div></div>
             <button onClick={runStratAI} disabled={stratAILoad} style={{padding:"8px 16px",fontSize:12,fontWeight:700,borderRadius:8,border:`1px solid ${CLR[strat.color][1]}`,background:CLR[strat.color][0],color:CLR[strat.color][1],cursor:"pointer",opacity:stratAILoad?0.6:1}}>
-              {stratAILoad?"Groq กำลังวิเคราะห์...":"🤖 AI Evaluate →"}
+              {stratAILoad?"กำลังวิเคราะห์...":"🤖 AI Evaluate →"}
             </button>
           </div>
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14,marginBottom:12}}>
-            <div>
-              <div style={{fontSize:11,fontWeight:700,marginBottom:7,color:"#6b7280"}}>Strategy Legs</div>
-              {strat.legs.map((l,i)=>(<div key={i} style={{display:"flex",gap:7,alignItems:"flex-start",marginBottom:6}}><div style={{width:18,height:18,borderRadius:"50%",background:CLR[strat.color][0],display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><span style={{fontSize:10,fontWeight:700,color:CLR[strat.color][1]}}>{i+1}</span></div><div style={{fontSize:13,lineHeight:1.5}}>{l}</div></div>))}
-            </div>
-            <div>
-              <div style={{fontSize:11,fontWeight:700,marginBottom:7,color:"#6b7280"}}>เมื่อไหร่ควรใช้</div>
-              <div style={{fontSize:13,lineHeight:1.7,marginBottom:8}}>{strat.when}</div>
-              <div style={{display:"flex",gap:5}}><Bdg c="green" ch={`Profit: ${strat.iv}`}/><Bdg c="red" ch="Risk: Limited"/></div>
-            </div>
+            <div><div style={{fontSize:11,fontWeight:700,marginBottom:7,color:"#6b7280"}}>Strategy Legs</div>{strat.legs.map((l,i)=>(<div key={i} style={{display:"flex",gap:7,alignItems:"flex-start",marginBottom:6}}><div style={{width:18,height:18,borderRadius:"50%",background:CLR[strat.color][0],display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><span style={{fontSize:10,fontWeight:700,color:CLR[strat.color][1]}}>{i+1}</span></div><div style={{fontSize:13,lineHeight:1.5}}>{l}</div></div>))}</div>
+            <div><div style={{fontSize:11,fontWeight:700,marginBottom:7,color:"#6b7280"}}>เมื่อไหร่ควรใช้</div><div style={{fontSize:13,lineHeight:1.7,marginBottom:8}}>{strat.when}</div></div>
           </div>
           {stratAI&&<div style={{background:CLR[strat.color][0],borderRadius:9,padding:12,borderLeft:`4px solid ${CLR[strat.color][1]}`}}><div style={{fontSize:12,fontWeight:700,marginBottom:6,color:CLR[strat.color][1]}}>AI Evaluation — {stratN} on {stratT}</div><div style={{fontSize:13,lineHeight:1.9,whiteSpace:"pre-wrap"}}>{stratAI}</div></div>}
-          {!stratAI&&!stratAILoad&&<div style={{fontSize:12,color:"#9ca3af",fontStyle:"italic"}}>กด "AI Evaluate" เพื่อให้ Groq วิเคราะห์ว่า {stratN} เหมาะกับ {stratT} ตอนนี้มั้ย</div>}
+          {!stratAI&&!stratAILoad&&<div style={{fontSize:12,color:"#9ca3af",fontStyle:"italic"}}>กด "AI Evaluate" เพื่อวิเคราะห์ว่า {stratN} เหมาะกับ {stratT} ตอนนี้มั้ย</div>}
         </div>
       </div>)}
 
@@ -539,7 +617,7 @@ Reply as plain text: 1)Fit: Excellent/Good/Poor + reason 2)Exact strikes & expir
           <Bdg c={earnLoad?"gray":"green"} ch={earnLoad?"กำลังโหลด...":"Finnhub Live"}/>
         </div>
         {earnLoad&&<div style={{textAlign:"center",padding:40,color:"#6b7280"}}>กำลังดึงข้อมูลจาก Finnhub...</div>}
-        {!earnLoad&&earnings.length===0&&<div style={{padding:20,color:"#6b7280",textAlign:"center"}}>ไม่พบข้อมูล — รอ 60 วินาทีแล้วรีเฟรช tab</div>}
+        {!earnLoad&&earnings.length===0&&<div style={{padding:20,color:"#6b7280",textAlign:"center"}}>ไม่พบข้อมูล — รีเฟรช tab ใหม่</div>}
         {earnings.length>0&&<div className="card" style={{background:"#fff",borderRadius:12,border:"1px solid #e5e7eb",overflow:"hidden"}}>
           <div style={{display:"grid",gridTemplateColumns:"82px 105px 1fr 85px 90px",gap:5,padding:"7px 14px",fontSize:10,color:"#9ca3af",borderBottom:"1px solid #f3f4f6",fontWeight:700,background:"#f9fafb"}}>
             <span>Ticker</span><span>วันที่</span><span>บริษัท</span><span>EPS est.</span><span>เวลา</span>
@@ -559,7 +637,8 @@ Reply as plain text: 1)Fit: Excellent/Good/Poor + reason 2)Exact strikes & expir
 
       {/* FOOTER */}
       <div style={{marginTop:20,padding:"10px 14px",background:"#f9fafb",borderRadius:10,border:"1px solid #e5e7eb",fontSize:11,color:"#9ca3af",lineHeight:1.7}}>
-        📊 ราคา + ข่าว + Earnings + Analyst: <strong>Finnhub Live API</strong> · 🤖 AI: <strong>Groq (Llama3) ฟรี</strong> · IV Rank: ประมาณการ (ต้องการ Tradier สำหรับข้อมูลจริง) · กด "สแกนใหม่" ทุกวันเพื่ออัปเดต Alpha Picks · ไม่ใช่คำแนะนำทางการเงิน
+        📊 Finnhub Live API · 🤖 Groq AI (Llama3 ฟรี) · IV Rank ประมาณการ ·
+        ถ้า Groq CORS ✗ → ย้ายไป <a href="https://netlify.com" target="_blank" style={{color:"#185FA5"}}>Netlify.com</a> (drag & drop ฟรี) · ไม่ใช่คำแนะนำทางการเงิน
       </div>
     </div>
   );
